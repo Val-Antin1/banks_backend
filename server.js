@@ -12,7 +12,9 @@ app.use(express.json());
 
 // Create transporter for Gmail
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // true for 465, false for other ports
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
@@ -39,7 +41,7 @@ app.post('/send-email', async (req, res) => {
   try {
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'valentinlyon205@gmail.com',
+      to: process.env.EMAIL_USER,
       replyTo: email,
       subject: `Contact Form Message from ${name}`,
       text: `Name: ${name}\nEmail: ${email}\nPhone: ${phone || 'Not provided'}\n\nMessage:\n${message}`,
@@ -53,7 +55,8 @@ app.post('/send-email', async (req, res) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    const result = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully:', result.messageId);
     res.json({ success: true, message: 'Email sent successfully' });
   } catch (error) {
     console.error('Error sending email:', error);
