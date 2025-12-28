@@ -6,6 +6,22 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+// Environment variable validation
+const requiredEnvVars = ['EMAIL_USER', 'EMAIL_PASS', 'OPENROUTER_API_KEY'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars.join(', '));
+  process.exit(1);
+}
+
+console.log('Environment variables validated successfully.');
+console.log('EMAIL_USER:', process.env.EMAIL_USER ? '✓ Set' : '✗ Missing');
+console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? '✓ Set' : '✗ Missing');
+console.log('OPENROUTER_API_KEY:', process.env.OPENROUTER_API_KEY ? '✓ Set' : '✗ Missing');
+console.log('OPENROUTER_BASE_URL:', process.env.OPENROUTER_BASE_URL || 'Using default');
+console.log('OPENROUTER_MODEL:', process.env.OPENROUTER_MODEL || 'Using default');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -76,7 +92,10 @@ app.post('/chat', async (req, res) => {
   }
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+    const model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -85,7 +104,7 @@ app.post('/chat', async (req, res) => {
         'X-Title': 'Home Accessories AI Assistant' // Optional
       },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini', // Using a good model, can be changed
+        model: model,
         messages: [
           {
             role: 'system',
