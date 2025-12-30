@@ -1,13 +1,13 @@
 require('dotenv').config();
 const express = require('express');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
 // Environment variable validation
-const requiredEnvVars = ['EMAIL_USER', 'EMAIL_PASS', 'OPENROUTER_API_KEY'];
+const requiredEnvVars = ['SENDGRID_API_KEY', 'EMAIL_USER', 'OPENROUTER_API_KEY'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -16,38 +16,18 @@ if (missingVars.length > 0) {
 }
 
 console.log('Environment variables validated successfully.');
+console.log('SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? '✓ Set' : '✗ Missing');
 console.log('EMAIL_USER:', process.env.EMAIL_USER ? '✓ Set' : '✗ Missing');
-console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? '✓ Set' : '✗ Missing');
 console.log('OPENROUTER_API_KEY:', process.env.OPENROUTER_API_KEY ? '✓ Set' : '✗ Missing');
 console.log('OPENROUTER_BASE_URL:', process.env.OPENROUTER_BASE_URL || 'Using default');
 console.log('OPENROUTER_MODEL:', process.env.OPENROUTER_MODEL || 'Using default');
 
+// Set SendGrid API key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Create transporter for Gmail
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // use SSL
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  connectionTimeout: 60000, // 60 seconds
-  greetingTimeout: 30000,   // 30 seconds
-  socketTimeout: 60000      // 60 seconds
-});
-
-// Verify transporter configuration
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Transporter verification failed:', error);
-  } else {
-    console.log('Transporter is ready to send emails');
-  }
-});
 
 // Email sending endpoint
 app.post('/send-email', async (req, res) => {
@@ -58,9 +38,9 @@ app.post('/send-email', async (req, res) => {
   }
 
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const msg = {
       to: process.env.EMAIL_USER,
+      from: process.env.EMAIL_USER, // Must be verified in SendGrid
       replyTo: email,
       subject: `Contact Form Message from ${name}`,
       text: `Name: ${name}\nEmail: ${email}\nPhone: ${phone || 'Not provided'}\n\nMessage:\n${message}`,
@@ -74,8 +54,8 @@ app.post('/send-email', async (req, res) => {
       `
     };
 
-    const result = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully:', result.messageId);
+    const result = await sgMail.send(msg);
+    console.log('Email sent successfully:', result[0]?.headers?.['x-message-id']);
     res.json({ success: true, message: 'Email sent successfully' });
   } catch (error) {
     console.error('Error sending email:', error);
