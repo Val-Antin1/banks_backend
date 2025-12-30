@@ -1,13 +1,13 @@
 require('dotenv').config();
 const express = require('express');
-const sgMail = require('@sendgrid/mail');
+const { Resend } = require('resend');
 const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
 // Environment variable validation
-const requiredEnvVars = ['SENDGRID_API_KEY', 'EMAIL_USER', 'OPENROUTER_API_KEY'];
+const requiredEnvVars = ['RESEND_API_KEY', 'EMAIL_USER', 'OPENROUTER_API_KEY'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -16,14 +16,14 @@ if (missingVars.length > 0) {
 }
 
 console.log('Environment variables validated successfully.');
-console.log('SENDGRID_API_KEY:', process.env.SENDGRID_API_KEY ? '✓ Set' : '✗ Missing');
+console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY ? '✓ Set' : '✗ Missing');
 console.log('EMAIL_USER:', process.env.EMAIL_USER ? '✓ Set' : '✗ Missing');
 console.log('OPENROUTER_API_KEY:', process.env.OPENROUTER_API_KEY ? '✓ Set' : '✗ Missing');
 console.log('OPENROUTER_BASE_URL:', process.env.OPENROUTER_BASE_URL || 'Using default');
 console.log('OPENROUTER_MODEL:', process.env.OPENROUTER_MODEL || 'Using default');
 
-// Set SendGrid API key
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Middleware
 app.use(cors());
@@ -38,10 +38,10 @@ app.post('/send-email', async (req, res) => {
   }
 
   try {
-    const msg = {
-      to: process.env.EMAIL_USER,
-      from: process.env.EMAIL_USER, // Must be verified in SendGrid
-      replyTo: email,
+    const data = await resend.emails.send({
+      from: process.env.EMAIL_USER, // Must be verified in Resend
+      to: [process.env.EMAIL_USER],
+      reply_to: email,
       subject: `Contact Form Message from ${name}`,
       text: `Name: ${name}\nEmail: ${email}\nPhone: ${phone || 'Not provided'}\n\nMessage:\n${message}`,
       html: `
@@ -52,10 +52,9 @@ app.post('/send-email', async (req, res) => {
         <p><strong>Message:</strong></p>
         <p>${message.replace(/\n/g, '<br>')}</p>
       `
-    };
+    });
 
-    const result = await sgMail.send(msg);
-    console.log('Email sent successfully:', result[0]?.headers?.['x-message-id']);
+    console.log('Email sent successfully:', data.id);
     res.json({ success: true, message: 'Email sent successfully' });
   } catch (error) {
     console.error('Error sending email:', error);
