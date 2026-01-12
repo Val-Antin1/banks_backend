@@ -44,7 +44,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads')));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
