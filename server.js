@@ -8,6 +8,8 @@ const path = require('path');
 const fs = require('fs');
 const { Resend } = require('resend');
 const cors = require('cors');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const Admin = require('./models/Admin');
 const Product = require('./models/Product');
@@ -16,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 
 // Environment variable validation
-const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET', 'RESEND_API_KEY', 'EMAIL_USER', 'OPENROUTER_API_KEY'];
+const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET', 'RESEND_API_KEY', 'EMAIL_USER', 'OPENROUTER_API_KEY', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -30,11 +32,33 @@ console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✓ Set' : '✗ Missing');
 console.log('RESEND_API_KEY:', process.env.RESEND_API_KEY ? '✓ Set' : '✗ Missing');
 console.log('EMAIL_USER:', process.env.EMAIL_USER ? '✓ Set' : '✗ Missing');
 console.log('OPENROUTER_API_KEY:', process.env.OPENROUTER_API_KEY ? '✓ Set' : '✗ Missing');
+console.log('CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME ? '✓ Set' : '✗ Missing');
+console.log('CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY ? '✓ Set' : '✗ Missing');
+console.log('CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET ? '✓ Set' : '✗ Missing');
 console.log('OPENROUTER_BASE_URL:', process.env.OPENROUTER_BASE_URL || 'Using default');
 console.log('OPENROUTER_MODEL:', process.env.OPENROUTER_MODEL || 'Using default');
 
 // Initialize Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Configure multer for Cloudinary uploads
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 800, height: 600, crop: 'limit' }]
+  },
+});
+
+const upload = multer({ storage });
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
@@ -44,23 +68,6 @@ mongoose.connect(process.env.MONGODB_URI)
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', cors(), express.static(path.join(__dirname, 'uploads')));
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ storage });
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -229,7 +236,7 @@ app.post('/api/products', authenticateToken, upload.single('image'), async (req,
     const product = new Product({
       name,
       description,
-      image: `/uploads/${req.file.filename}`,
+      image: req.file.path, // Cloudinary URL
       price: parseFloat(price) || 0,
       category: category || 'General',
       keyFeatures: parsedKeyFeatures,
@@ -280,7 +287,7 @@ app.put('/api/products/:id', authenticateToken, upload.single('image'), async (r
     };
 
     if (req.file) {
-      updateData.image = `/uploads/${req.file.filename}`;
+      updateData.image = req.file.path; // Cloudinary URL
     }
 
     const product = await Product.findByIdAndUpdate(id, updateData, { new: true });
