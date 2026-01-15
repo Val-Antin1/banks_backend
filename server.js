@@ -129,7 +129,7 @@ app.post('/send-email', async (req, res) => {
 
   try {
     const data = await resend.emails.send({
-      from: process.env.EMAIL_USER, // Must be verified in Resend
+      from: 'onboarding@resend.dev',
       to: [process.env.EMAIL_USER],
       reply_to: email,
       subject: `Contact Form Message from ${name}`,
