@@ -321,6 +321,9 @@ app.delete('/api/products/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// For Vercel deployment
+module.exports = app;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
